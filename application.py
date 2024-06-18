@@ -1,7 +1,9 @@
 from PyQt6.QtWidgets import *
 
+import os
+
 from manager import Manager
-from ui import MainWindow
+from ui import *
 
 class Application:
     def __init__(self):
@@ -16,15 +18,32 @@ class Application:
         self.gui.track_entry_save_button.clicked.connect(self.save_track)
         self.gui.art_image_browse_button.clicked.connect(self.browse_image)
 
+        self.new_playlist_menu_dialog = NewPlaylistMenuDialog(self.new_playlist)
+        self.open_playlist_menu_dialog = OpenPlaylistMenuDialog(self.open_playlist, self.delete_playlist)
+
     def run(self):
         self.gui.show()
         self.app.exec()
 
     def open_playlist_menu(self):
-        pass
+        self.open_playlist_menu_dialog.exec()
+
+    def open_playlist(self, name: str):
+        print(f"Opening playlist: {name}")
+
+    def delete_playlist(self, name: str):
+        print(f"Deleting playlist: {name}")
 
     def new_playlist_menu(self):
-        pass
+        self.new_playlist_menu_dialog.exec()
+
+    def new_playlist(self, name: str, path: str) -> bool:
+        if not self.manager.playlist_exists(name) and os.path.isdir(path):
+            print(f"Making new playlist {name}, at {path}")
+            return True 
+        else:
+            print("A playlist with that name already exists or the directory is invalid")
+            return False 
 
     def sync_playlists(self):
         pass
@@ -33,6 +52,9 @@ class Application:
         pass
 
     def save_track(self):
+        pass
+
+    def delete_track(self):
         pass
 
     def browse_image(self):

@@ -1,6 +1,6 @@
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QDir
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -164,3 +164,100 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
         layout.addWidget(self.track_album_input)
         return container 
+
+class NewPlaylistMenuDialog(QDialog):
+    def __init__(self, ok_callback):
+        super().__init__()
+
+        self.file_path = ""
+
+        self.setWindowTitle("New Playlist")
+        self.closeEvent = self.clear_lines
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.ok_callback = ok_callback
+        
+        self.layout = QVBoxLayout()
+
+        name_container = QWidget()
+        name_layout = QHBoxLayout()
+        self.name_input = QLineEdit()
+        name_container.setLayout(name_layout)
+        name_layout.addWidget(QLabel("Name"))
+        name_layout.addWidget(self.name_input)
+
+        dir_container = QWidget()
+        dir_layout = QHBoxLayout()
+        self.dir_button = QPushButton("Browse")
+        self.dir_button.clicked.connect(self.file_browse)
+        dir_container.setLayout(dir_layout)
+        dir_layout.addWidget(QLabel("Path"))
+        dir_layout.addWidget(self.dir_button)
+
+        self.button_box.accepted.connect(self.ok)
+        self.button_box.rejected.connect(self.cancel)
+
+        self.layout.addWidget(name_container)
+        self.layout.addWidget(dir_container)
+        self.layout.addWidget(self.button_box)
+        self.setLayout(self.layout)
+        
+    def ok(self):
+        if self.ok_callback(self.name_input.text(), self.file_path):
+            self.clear_lines()
+            self.close()
+        else:
+            print("Try again")
+
+    def clear_lines(self, event=None):
+        self.name_input.clear()
+        self.file_path = ""
+
+    def file_browse(self):
+        self.file_path = QFileDialog.getExistingDirectory(self, "Open Directory", QDir.homePath(), options=QFileDialog.Option.ReadOnly)
+
+    def cancel(self):
+        self.clear_lines()
+        self.close()
+
+class OpenPlaylistMenuDialog(QDialog):
+    def __init__(self, open_callback, delete_callback):
+        super().__init__()
+
+        self.setWindowTitle("Open Playlist")
+        self.open_callback = open_callback
+        self.delete_callback = delete_callback
+
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        self.list_view = QListView()
+        model = QStandardItemModel()
+        self.list_view.setModel(model)
+
+        rows = ['red', 'blue', 'green', 'yellow', 'more', 'more', '1', '2', '3', 'sadf', 'adfasd', 'adafsfa', 'asdfadfjak', 'adsfjkadf', 'adfjklds']
+
+        for i in rows:
+            model.appendRow(QStandardItem(i))
+
+        button_layout = QHBoxLayout()
+        button_container = QWidget()
+        button_container.setLayout(button_layout)
+
+        open_button = QPushButton("Open")
+        open_button.clicked.connect(self.open_playlist)
+        delete_button = QPushButton("Delete")
+        delete_button.clicked.connect(self.delete_playlist)
+
+        button_layout.addWidget(delete_button)
+        button_layout.addWidget(open_button)
+
+        layout.addWidget(self.list_view)
+        layout.addWidget(button_container)
+    
+    def open_playlist(self):
+        playlist = self.list_view.selectionModel().currentIndex().data()        
+        self.open_callback(playlist)
+
+    def delete_playlist(self):
+        playlist = self.list_view.selectionModel().currentIndex().data()        
+        self.delete_callback(playlist)
