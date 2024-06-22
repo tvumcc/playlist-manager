@@ -1,6 +1,7 @@
 from PyQt6.QtCore import QSize, Qt, QDir
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem
+from PyQt6.QtSql import QSqlDatabase, QSqlTableModel
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -26,9 +27,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_container)
 
     def init_table_view(self):
+        self.qdb = QSqlDatabase("QSQLITE")
+        self.qdb.setDatabaseName("main.db")
+        self.qdb.open()
+
         self.current_playlist_label = QLabel("Current Playlist: None")
         self.table = QTableView()
-        pass
+        self.table_model = QSqlTableModel(self, self.qdb)
+        self.table.setModel(self.table_model)
 
     def init_controls_box(self):
         self.control_box = QGroupBox("Controls")
@@ -38,7 +44,7 @@ class MainWindow(QMainWindow):
         control_box_buttons_layout = QHBoxLayout()
         self.open_playlist_button = QPushButton("Open Playlist")
         self.new_playlist_button = QPushButton("New Playlist")
-        self.sync_playlists_button = QPushButton("Sync Playlists")
+        self.sync_playlists_button = QPushButton("Sync Playlist")
         self.new_track_button = QPushButton("New Track")
         control_box_buttons_layout.addWidget(self.open_playlist_button)
         control_box_buttons_layout.addWidget(self.new_playlist_button)
@@ -100,6 +106,7 @@ class MainWindow(QMainWindow):
 
         data_box_layout.addWidget(text_entry_container) 
         data_box_layout.addWidget(image_entry_container)
+        self.data_box.setEnabled(False)
 
     #
     # Helper Functions
@@ -221,7 +228,7 @@ class NewPlaylistMenuDialog(QDialog):
         self.close()
 
 class OpenPlaylistMenuDialog(QDialog):
-    def __init__(self, open_callback, delete_callback):
+    def __init__(self, playlist_names: list, open_callback, delete_callback):
         super().__init__()
 
         self.setWindowTitle("Open Playlist")
@@ -231,13 +238,10 @@ class OpenPlaylistMenuDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
         self.list_view = QListView()
-        model = QStandardItemModel()
-        self.list_view.setModel(model)
+        self.model = QStandardItemModel()
+        self.list_view.setModel(self.model)
 
-        rows = ['red', 'blue', 'green', 'yellow', 'more', 'more', '1', '2', '3', 'sadf', 'adfasd', 'adafsfa', 'asdfadfjak', 'adsfjkadf', 'adfjklds']
-
-        for i in rows:
-            model.appendRow(QStandardItem(i))
+        self.load_playlists(playlist_names)
 
         button_layout = QHBoxLayout()
         button_container = QWidget()
@@ -248,15 +252,23 @@ class OpenPlaylistMenuDialog(QDialog):
         delete_button = QPushButton("Delete")
         delete_button.clicked.connect(self.delete_playlist)
 
-        button_layout.addWidget(delete_button)
         button_layout.addWidget(open_button)
+        button_layout.addWidget(delete_button)
 
         layout.addWidget(self.list_view)
         layout.addWidget(button_container)
     
+    def load_playlists(self, playlists: list):
+        self.model.clear()
+        for playlist in playlists:
+            item = QStandardItem(playlist)
+            item.setEditable(False)
+            self.model.appendRow(item)
+
     def open_playlist(self):
         playlist = self.list_view.selectionModel().currentIndex().data()        
         self.open_callback(playlist)
+        self.close()
 
     def delete_playlist(self):
         playlist = self.list_view.selectionModel().currentIndex().data()        
