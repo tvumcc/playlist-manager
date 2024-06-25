@@ -10,5 +10,3 @@ from application import Application
 if __name__ == "__main__":
     app = Application()
     app.run()
-
-    # pytube.YouTube("https://www.youtube.com/watch?v=kK81m-A3qpU").streams.get_audio_only(subtype="webm").download(filename="intermediate.webm")

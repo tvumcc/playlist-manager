@@ -1,7 +1,12 @@
 from PyQt6.QtCore import QSize, Qt, QDir
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem, QAction, QIcon
 from PyQt6.QtSql import QSqlDatabase, QSqlTableModel
+
+import os
+import requests
+
+from track import Track
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -9,8 +14,10 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Playlist Manager")
         self.setFixedSize(QSize(1200, 900))
-        self.menuBar().addMenu("Settings")
-        self.menuBar().addMenu("Help")
+        settings_menu = self.menuBar().addMenu("Settings")
+        self.spotify_action = QAction("Spotify Client Info", self)
+        settings_menu.addAction(self.spotify_action)
+        help_menu = self.menuBar().addMenu("Help")
 
         self.init_table_view()
         self.init_controls_box()
@@ -21,6 +28,9 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(self.table)
         self.main_layout.addWidget(self.control_box)
         self.main_layout.addWidget(self.data_box)
+
+        self.art_path = ""
+        self.art_image_browse_button.clicked.connect(self.browse_art_image)
 
         main_container = QWidget()
         main_container.setLayout(self.main_layout)
@@ -35,6 +45,9 @@ class MainWindow(QMainWindow):
         self.table = QTableView()
         self.table_model = QSqlTableModel(self, self.qdb)
         self.table.setModel(self.table_model)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
 
     def init_controls_box(self):
         self.control_box = QGroupBox("Controls")
@@ -77,26 +90,32 @@ class MainWindow(QMainWindow):
         text_entry_container_layout.setSpacing(0)
         text_entry_container_layout.setContentsMargins(0, 0, 0, 0)
 
+        button_container = QWidget()
+        button_container_layout = QHBoxLayout()
+        button_container.setLayout(button_container_layout)
+
         self.track_entry_save_button = QPushButton("Save")
+        self.track_entry_delete_button = QPushButton("Delete")
+        button_container_layout.addWidget(self.track_entry_save_button)
+        button_container_layout.addWidget(self.track_entry_delete_button)
 
         text_entry_container_layout.addWidget(self.init_youtube_link_input())
         text_entry_container_layout.addWidget(self.init_spotify_link_input())
         text_entry_container_layout.addWidget(self.init_track_title_input())
         text_entry_container_layout.addWidget(self.init_track_artists_input())
         text_entry_container_layout.addWidget(self.init_track_album_input())
-        text_entry_container_layout.addWidget(self.track_entry_save_button)
+        text_entry_container_layout.addWidget(button_container)
 
         # Image Part
-        image_entry_container = QGroupBox("Track Art")
+        image_entry_container = QGroupBox("Track Art Preview")
         image_entry_container_layout = QVBoxLayout()
         image_entry_container.setLayout(image_entry_container_layout)
 
-        self.art_image_label = QLabel("Image: blue_turtle.jpg")
-
+        self.art_image_label = QLabel()
         self.art_image_display = QLabel()
         self.art_image_display.setFixedSize(QSize(200, 200))
-        self.art_image_display.setPixmap(QPixmap("blue_turtle.jpg"))
         self.art_image_display.setScaledContents(True)
+        self.set_art_image("")
 
         self.art_image_browse_button = QPushButton("Browse")
 
@@ -107,10 +126,6 @@ class MainWindow(QMainWindow):
         data_box_layout.addWidget(text_entry_container) 
         data_box_layout.addWidget(image_entry_container)
         self.data_box.setEnabled(False)
-
-    #
-    # Helper Functions
-    #
 
     def init_youtube_link_input(self) -> QWidget:
         container = QWidget()
@@ -171,6 +186,71 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
         layout.addWidget(self.track_album_input)
         return container 
+
+    def load_sql_table(self, playlist_name: str):
+        self.table_model.setTable(playlist_name)
+        self.table_model.select()
+        self.table.resizeColumnsToContents()
+        # hidden_columns = [2, 3, 5, 6, 7]
+        # for col in hidden_columns:
+        #     self.table.hideColumn(col)
+
+    def set_data_box_greyed_out(self, state: bool):
+        self.data_box.setEnabled(not state)
+
+    def set_art_image(self, path: str):
+        if path != "" and path is not None:
+            self.art_image_label.setText(f"Image: {os.path.basename(path)[:20]}")
+            self.art_image_display.setPixmap(QPixmap(path))
+        else: # No Image
+            self.art_image_display.clear()
+            self.art_image_label.setText("No Image Selected")
+
+    def set_spotify_art_image(self, url: str):
+        self.art_image_label.setText("Spotify Image")
+
+        image = QPixmap()
+        image.loadFromData(requests.get(url).content)
+        self.art_image_display.setPixmap(image)
+
+    def browse_art_image(self):
+        self.art_path = QFileDialog.getOpenFileName(self, "Open Image", QDir.homePath(), "Images (*.jpg *.png *.bmp *.webp)", options=QFileDialog.Option.ReadOnly)[0]
+        self.set_art_image(self.art_path)
+
+    def clear_data_box(self):
+        self.track_title_input.clear()
+        self.track_artists_input.clear()
+        self.youtube_link_input.clear()
+        self.spotify_link_input.clear()
+        self.track_album_input.clear()
+        self.set_art_image("")
+
+    def load_track_into_data_box(self, track: Track):
+        self.track_title_input.setText(track.title)
+        self.track_artists_input.setText(track.artists)
+        self.youtube_link_input.setText(track.yt)
+        self.spotify_link_input.setText(track.spotify)
+        self.track_album_input.setText(track.album)
+
+        if track.art_path != "":
+            self.set_art_image(track.art_path)
+        elif track.art_url != "":
+            self.set_spotify_art_image(track.art_url)
+        else:
+            self.set_art_image(None)
+
+    def get_selected_track_name(self) -> str:
+        row = self.table.selectionModel().currentIndex().row()
+        track_name = self.table_model.index(row, 0).data() # Get the title of the track
+        return track_name
+
+    def track_invalid_message_box(self):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Invalid Track")
+        dialog.setText("The track was not saved. A track must have at least a valid YouTube Video URL, and valid Spotify Track URL or title.")
+        button = dialog.exec()
+        if button == QMessageBox.StandardButton.Ok:
+            dialog.close()
 
 class NewPlaylistMenuDialog(QDialog):
     def __init__(self, ok_callback):
@@ -273,3 +353,51 @@ class OpenPlaylistMenuDialog(QDialog):
     def delete_playlist(self):
         playlist = self.list_view.selectionModel().currentIndex().data()        
         self.delete_callback(playlist)
+
+class SpotifyClientInfoDialog(QDialog):
+    def __init__(self, ok_callback):
+        super().__init__()
+
+        self.layout = QVBoxLayout()
+        self.setWindowTitle("Spotify Client Credentials")
+        self.setFixedWidth(500)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self.ok)
+        self.button_box.rejected.connect(self.cancel)
+        self.ok_callback = ok_callback
+
+        client_id_container = QWidget()
+        client_id_layout = QHBoxLayout()
+        client_id_container.setLayout(client_id_layout)
+        self.client_id_input = QLineEdit()
+        client_id_layout.addWidget(QLabel("Client ID"))
+        client_id_layout.addWidget(self.client_id_input)
+
+        client_secret_container = QWidget()
+        client_secret_layout = QHBoxLayout()
+        client_secret_container.setLayout(client_secret_layout)
+        self.client_secret_input = QLineEdit()
+        client_secret_layout.addWidget(QLabel("Client Secret"))
+        client_secret_layout.addWidget(self.client_secret_input)
+
+        self.layout.addWidget(client_id_container)
+        self.layout.addWidget(client_secret_container)
+        self.layout.addWidget(self.button_box)
+
+        self.setLayout(self.layout)
+
+    def ok(self):
+        if self.ok_callback(self.client_id_input.text(), self.client_secret_input.text()):
+            self.clear_lines()
+            self.close()
+        else:
+            print("Try again")
+
+    def cancel(self):
+        self.clear_lines()
+        self.close()
+
+    def clear_lines(self, event=None):
+        self.client_id_input.clear()
+        self.client_secret_input.clear()

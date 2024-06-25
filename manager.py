@@ -7,50 +7,88 @@ class Manager:
     def __init__(self):
         self.con = sqlite3.connect("main.db")
         self.cursor = self.con.cursor()
-        self.current_playlist = None
-        self.current_track = None
+        self.playlist_to_path_table = "__playlist_to_path__"
 
-    def playlist_exists(self, name: str) -> bool:
-        return self.cursor.execute(f"SELECT name FROM sqlite_master WHERE name='{name}' AND type='table'").fetchone() is not None
+        if not self.playlist_exists(self.playlist_to_path_table):
+            self.cursor.execute(f"CREATE TABLE '{self.playlist_to_path_table}'(playlist TEXT, path TEXT)")
+
+    # Playlists
+    """Returns true if the playlist exists and false otherwise"""
+    def playlist_exists(self, playlist_name: str) -> bool:
+        return self.cursor.execute(f"SELECT name FROM sqlite_master WHERE name='{playlist_name}' AND type='table'").fetchone() is not None
     
-    def track_exists(self, name: str) -> bool:
-        return self.cursor.execute(f"SELECT title FROM '{self.current_playlist}' WHERE title='{name}'").fetchone() is not None
+    """Returns the path to the location of the specified playlist"""
+    def get_playlist_path(self, playlist_name: str) -> str:
+        return self.cursor.execute(f"SELECT path FROM {self.playlist_to_path_table} WHERE playlist='{playlist_name}'").fetchone()[0]
 
+    """Returns a list of all the playlist names stored in the database"""
     def get_playlists(self) -> list:
-        playlists = self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        playlists = self.cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND NOT name='{self.playlist_to_path_table}'").fetchall()
         return [x[0] for x in playlists]
 
-    def get_track(self):
-        print(self.cursor.execute(f"SELECT * FROM '{self.current_playlist}' WHERE title='{self.current_track}'"))
-
-    def open_playlist(self, name: str):
-        self.current_playlist = name
-
-    def select_track(self, name: str):
-        self.current_track = name
-
-    def new_playlist(self, name: str) -> bool:
-        if name not in self.get_playlists():
-            self.cursor.execute(f"CREATE TABLE '{name}'(title, artists, yt, spotify, artpath, filepath)")
-            return True
-        else:
-            return False
-
-    def delete_playlist(self, name: str) -> bool:
-        if name in self.get_playlists():
-            self.cursor.execute(f"DROP TABLE '{name}'")
-            return True
-        else:
-            return False
-
-    def add_track(self, track: Track) -> bool:
-        if not self.track_exists(track.title):
-            self.cursor.execute(f"INSERT INTO '{self.current_playlist}' VALUES ('{track.title}', '{track.artists}', '{track.yt}', '{track.spotify}', '{track.art_path}', '')")
+    """Creates a new playlist with a given name and adds it to the database"""
+    def new_playlist(self, playlist_name: str, playlist_path: str) -> bool:
+        if playlist_name not in self.get_playlists():
+            self.cursor.execute(f"CREATE TABLE '{playlist_name}'(title TEXT, artists TEXT, yt TEXT, spotify TEXT, album TEXT, artpath TEXT, arturl TEXT, filepath TEXT, synced INTEGER DEFAULT 0)")
+            self.cursor.execute(f"INSERT INTO '{self.playlist_to_path_table}' VALUES ('{playlist_name}', '{playlist_path}')")
             self.con.commit()
             return True
         else:
             return False
 
-    def print_out_tracks(self):
-        tracks = self.cursor.execute(f"SELECT * FROM '{self.current_playlist}'").fetchall()
-        print(tracks)
+    """Removes a playlist and all its tracks from the database. Returns true if the playlist exists and false otherwise"""
+    def delete_playlist(self, playlist_name: str) -> bool:
+        if playlist_name in self.get_playlists():
+            self.cursor.execute(f"DROP TABLE '{playlist_name}'")
+            self.cursor.execute(f"DELETE FROM '{self.playlist_to_path_table}' WHERE playlist='{playlist_name}'")
+            self.con.commit()
+            return True
+        else:
+            return False
+
+    # Tracks
+    """Returns a track object from the database given the track's name"""
+    def get_track(self, playlist_name: str, track_name: str) -> Track:
+        track_data = self.cursor.execute(f"SELECT title, artists, yt, spotify, album, artpath, arturl FROM '{playlist_name}' WHERE title='{track_name}'").fetchone()
+        return Track(*track_data)
+
+    """Returns true if the track is in the playlist and false otherwise"""
+    def track_exists(self, playlist_name: str, track_name: str) -> bool:
+        return self.cursor.execute(f"SELECT title FROM '{playlist_name}' WHERE title='{track_name}'").fetchone() is not None
+
+    """Adds a track to the specified playlist"""
+    def add_track(self, playlist_name: str, track: Track) -> bool:
+        if not self.track_exists(playlist_name, track.title):
+            self.cursor.execute(f"INSERT INTO '{playlist_name}' VALUES ('{track.title}', '{track.artists}', '{track.yt}', '{track.spotify}', '{track.album}', '{track.art_path}', '{track.art_url}', '', 0)")
+            self.con.commit()
+            return True
+        else:
+            return False
+
+    """Replaces a track in a specified playlist with a new track"""
+    def replace_track(self, playlist_name: str, track_name: str, new_track: Track):
+        self.cursor.execute(f"UPDATE '{playlist_name}' SET title='{new_track.title}', artists='{new_track.artists}',  yt='{new_track.yt}', spotify='{new_track.spotify}', album='{new_track.album}', artpath='{new_track.art_path}', arturl='{new_track.art_url}', synced=0 WHERE title='{track_name}'")
+        self.con.commit()
+
+    """Removes a track from the specified playlist's table. Returns true if the track exists and false otherwise."""
+    def delete_track(self, playlist_name: str, track_name: str):
+        if self.track_exists(playlist_name, track_name):
+            self.cursor.execute(f"DELETE FROM '{playlist_name}' WHERE title='{track_name}'")
+            self.con.commit()
+            return True
+        else:
+            return False
+
+    """Returns a list of Track objects which need to be synced. This consists of tracks which don't have a file associated with them or have not been marked as synced."""
+    def get_tracks_to_sync(self, playlist_name: str) -> list[Track]:
+        tracks = []
+        tracks_query = self.cursor.execute(f"SELECT title, filepath, synced FROM '{playlist_name}'").fetchall()
+        for record in tracks_query:
+            if not os.path.isfile(record[1]) or record[2] != 1:
+                tracks.append(self.get_track(playlist_name, record[0]))
+        return tracks
+
+    """Sets the specified track to be synced in the database."""
+    def set_track_to_synced(self, playlist_name: str, track_name: str, file_path: str):
+        self.cursor.execute(f"UPDATE '{playlist_name}' SET filepath='{file_path}', synced=1 WHERE title='{track_name}'")
+        self.con.commit()
