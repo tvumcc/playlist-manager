@@ -13,7 +13,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle(title)
-        self.setFixedSize(QSize(1200, 900))
+        self.resize(QSize(800, 700))
         settings_menu = self.menuBar().addMenu("Settings")
         self.spotify_action = QAction("Spotify Client Info", self)
         settings_menu.addAction(self.spotify_action)
