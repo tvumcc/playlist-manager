@@ -5,8 +5,11 @@ from track import Track
 
 class Manager:
     def __init__(self):
+        # Initialize handles to the sqlite databases
         self.con = sqlite3.connect("main.db")
         self.cursor = self.con.cursor()
+
+        # Initialize the special table which maps playlist names to their corresponding locations on disk
         self.playlist_to_path_table = "__playlist_to_path__"
 
         if not self.playlist_exists(self.playlist_to_path_table):
@@ -56,7 +59,7 @@ class Manager:
     def track_exists(self, playlist_name: str, track_name: str) -> bool:
         return self.cursor.execute(f"SELECT title FROM '{playlist_name}' WHERE title='{track_name}'").fetchone() is not None
 
-    """Adds a track to the specified playlist"""
+    """Adds a track to the specified playlist. Returns false if a track with that title already exists in that playlist and true otherwise"""
     def add_track(self, playlist_name: str, track: Track) -> bool:
         if not self.track_exists(playlist_name, track.title):
             self.cursor.execute(f"INSERT INTO '{playlist_name}' VALUES ('{track.title}', '{track.artists}', '{track.yt}', '{track.spotify}', '{track.album}', '{track.art_path}', '{track.art_url}', '', 0)")
@@ -71,7 +74,7 @@ class Manager:
         self.con.commit()
 
     """Removes a track from the specified playlist's table. Returns true if the track exists and false otherwise."""
-    def delete_track(self, playlist_name: str, track_name: str):
+    def delete_track(self, playlist_name: str, track_name: str) -> bool:
         if self.track_exists(playlist_name, track_name):
             self.cursor.execute(f"DELETE FROM '{playlist_name}' WHERE title='{track_name}'")
             self.con.commit()

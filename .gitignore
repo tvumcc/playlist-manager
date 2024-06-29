@@ -168,5 +168,6 @@ cython_debug/
 *.mp3
 *.jpg
 *.png
+*.exe
 client_info.txt
 token.txt

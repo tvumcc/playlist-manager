@@ -17,6 +17,7 @@ class Track:
         self.art_path = art_path
         self.art_url = art_url
 
+        # Determine whether or not it should fetch data from Spotify
         if spotify != "" and (self.title == "" or self.artists == "" or self.album == "" or self.art_url == ""):
             access_token = get_access_token()
             if access_token is not None:
@@ -50,14 +51,11 @@ class Track:
             else:
                 return False
 
+        # Make sure theres either a Spotify link or a title
         if self.spotify == "" and self.title == "":
             return False
 
         return True
-
-    """Returns a string representation of the track for debugging purposes"""
-    def __str__(self) -> str:
-        return f"Title={self.title}, Artists={self.artists}, Yt={self.yt}, Spotify={self.spotify}, Album={self.album}, Art Path={self.art_path}"
 
     """Requests metadata about the track through the Spotify API, returns the status code of the response"""
     def get_spotify_metadata(self, access_token: str) -> int:
@@ -78,18 +76,18 @@ class Track:
         
         return spotify_response.status_code
     
-    """Downloads the YouTube audio, Spotify image (if applicable), and splices it into an mp3 file"""
-    def download(self, root_path: str) -> str:
-        # Download video audio using pytube
+    """Download video audio using pytube as well as the Spotify image if an art url was provided"""
+    def get_yt_video(self):
         pytube.YouTube(self.yt).streams.get_audio_only(subtype="webm").download(filename="intermediate.webm")
-        # pytube.YouTube(self.yt).streams.filter(only_audio=True, adaptive=True).get_by_itag(251).download(filename="intermediate.webm")
 
-        # Download image data from spotify (if not overridden by user artwork path)
+        # Download image data from spotify (if not overriden by user artwork path)
         if self.art_url != "" and self.art_path == "":
             artwork = requests.get(self.art_url)
             with open("cover.jpg", "bw") as artwork_file:
                 artwork_file.write(artwork.content)
 
+    """Splice all the data together with ffmpeg"""
+    def splice_ffmpeg(self):
         artwork_file = None
         if os.path.isfile(self.art_path): artwork_file = self.art_path
         elif os.path.isfile("cover.jpg"): artwork_file = "cover.jpg"
@@ -97,14 +95,25 @@ class Track:
         commands = ["ffmpeg", "-loglevel", "quiet", "-i", "intermediate.webm", "intermediate1.mp3", "&&", "ffmpeg", "-loglevel", "quiet", "-i", "intermediate1.mp3"]
         if artwork_file is not None:
             commands += ["-i", f'{artwork_file}', "-c", "copy", "-map", "0", "-map", "1"]
-        commands += ["-metadata", f'artist={self.artists}', "-metadata", f'title={self.title}', "-metadata", f"album={self.album}", "intermediate.mp3"]
+        commands += ["-id3v2_version", "3", "-metadata", f'artist={self.artists}', "-metadata", f'title={self.title}', "-metadata", f"album={self.album}", "intermediate.mp3"]
 
         # Splice image, audio, artists, and title together
         subprocess.run(commands, shell=True)
 
-        # Clean up intermediate files
+    """Does renaming, removes temporary files, and moves the final file to the directory of the playlist"""
+    def clean(self, root_path: str):
         os.remove("intermediate.webm")
         os.remove("intermediate1.mp3")
+        if os.path.isfile("cover.jpg"): os.remove("cover.jpg")
+
+        file_name = re.sub(r"[,:]", "", self.title) # Replace the invalid characters in a track name
+        track_path = os.path.join(root_path, f"{file_name}.mp3")
+
+        # Make sure that if a file with the same name exists in the directory, it gets replaced
         try: 
-            os.rename("intermediate.mp3", os.path.join(root_path, f"{re.sub(r"[,:]", "", self.title)}.mp3")) # Sanitize file name so that it can exist
-        except FileExistsError: print(f"File \"{self.title}.mp3\" already exists!")
+            os.rename("intermediate.mp3", track_path)
+        except FileExistsError:
+            os.remove(track_path)
+            os.rename("intermediate.mp3", track_path)
+
+        return track_path

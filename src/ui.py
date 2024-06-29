@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QSize, Qt, QDir
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem, QAction, QIcon
+from PyQt6.QtGui import QPixmap, QStandardItemModel, QStandardItem, QAction
 from PyQt6.QtSql import QSqlDatabase, QSqlTableModel
 
 import os
@@ -9,10 +9,10 @@ import requests
 from track import Track
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, title: str):
         super().__init__()
 
-        self.setWindowTitle("Playlist Manager")
+        self.setWindowTitle(title)
         self.setFixedSize(QSize(1200, 900))
         settings_menu = self.menuBar().addMenu("Settings")
         self.spotify_action = QAction("Spotify Client Info", self)
@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         main_container.setLayout(self.main_layout)
         self.setCentralWidget(main_container)
 
+    # UI Base View
     def init_table_view(self):
         self.qdb = QSqlDatabase("QSQLITE")
         self.qdb.setDatabaseName("main.db")
@@ -187,6 +188,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.track_album_input)
         return container 
 
+    # UI Interaction
     def load_sql_table(self, playlist_name: str):
         self.table_model.setTable(playlist_name)
         self.table_model.select()
@@ -244,6 +246,14 @@ class MainWindow(QMainWindow):
         track_name = self.table_model.index(row, 0).data() # Get the title of the track
         return track_name
 
+    def playlist_invalid_message_box(self):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Invalid")
+        dialog.setText("The playlist was not created. Make sure that the playlist name is unique and the specified path exists.")
+        button = dialog.exec()
+        if button == QMessageBox.StandardButton.Ok:
+            dialog.close()
+
     def track_invalid_message_box(self):
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Invalid Track")
@@ -251,6 +261,39 @@ class MainWindow(QMainWindow):
         button = dialog.exec()
         if button == QMessageBox.StandardButton.Ok:
             dialog.close()
+    
+    def playlist_deletion_confirmation(self, playlist: str) -> bool:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Delete Playlist")
+        dialog.setText(f"Are you sure you want to delete playlist \"{playlist}\"?")
+        dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        button = dialog.exec()
+        
+        if button == QMessageBox.StandardButton.Yes: 
+            return True
+        else: 
+            return False
+
+    def track_deletion_confirmation(self, track: str) -> bool:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Delete Track")
+        dialog.setText(f"Are you sure you want to delete track \"{track}\"?")
+        dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        button = dialog.exec()
+        
+        if button == QMessageBox.StandardButton.Yes: 
+            return True
+        else: 
+            return False
+
+    def set_progress_bar_status(self, status: str):
+        self.status_label.setText(f"Status: {status}")
+
+    def set_progress_bar_range(self, max: int):
+        self.download_progress_bar.setRange(0, max)
+
+    def set_progress_bar_percentage(self, value: int):
+        self.download_progress_bar.setValue(value)
 
 class NewPlaylistMenuDialog(QDialog):
     def __init__(self, ok_callback):
@@ -293,8 +336,6 @@ class NewPlaylistMenuDialog(QDialog):
         if self.ok_callback(self.name_input.text(), self.file_path):
             self.clear_lines()
             self.close()
-        else:
-            print("Try again")
 
     def clear_lines(self, event=None):
         self.name_input.clear()
@@ -391,8 +432,6 @@ class SpotifyClientInfoDialog(QDialog):
         if self.ok_callback(self.client_id_input.text(), self.client_secret_input.text()):
             self.clear_lines()
             self.close()
-        else:
-            print("Try again")
 
     def cancel(self):
         self.clear_lines()
