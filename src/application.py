@@ -36,7 +36,6 @@ class Application:
         self.app.exec()
 
     # Playlists
-
     """Opens the dialog by which users select a playlist"""
     def open_playlist_menu(self):
         self.open_playlist_menu_dialog.load_playlists(self.manager.get_playlists())

@@ -17,7 +17,6 @@ class MainWindow(QMainWindow):
         settings_menu = self.menuBar().addMenu("Settings")
         self.spotify_action = QAction("Spotify Client Info", self)
         settings_menu.addAction(self.spotify_action)
-        help_menu = self.menuBar().addMenu("Help")
 
         self.init_table_view()
         self.init_controls_box()
@@ -58,12 +57,12 @@ class MainWindow(QMainWindow):
         control_box_buttons_layout = QHBoxLayout()
         self.open_playlist_button = QPushButton("Open Playlist")
         self.new_playlist_button = QPushButton("New Playlist")
-        self.sync_playlists_button = QPushButton("Sync Playlist")
         self.new_track_button = QPushButton("New Track")
+        self.sync_playlists_button = QPushButton("Sync Playlist")
         control_box_buttons_layout.addWidget(self.open_playlist_button)
         control_box_buttons_layout.addWidget(self.new_playlist_button)
-        control_box_buttons_layout.addWidget(self.sync_playlists_button)
         control_box_buttons_layout.addWidget(self.new_track_button)
+        control_box_buttons_layout.addWidget(self.sync_playlists_button)
 
         self.status_label = QLabel()
         self.status_label.setText("Status: Not Started")
@@ -193,9 +192,9 @@ class MainWindow(QMainWindow):
         self.table_model.setTable(playlist_name)
         self.table_model.select()
         self.table.resizeColumnsToContents()
-        # hidden_columns = [2, 3, 5, 6, 7]
-        # for col in hidden_columns:
-        #     self.table.hideColumn(col)
+        hidden_columns = [2, 3, 5, 6, 7, 8]
+        for col in hidden_columns:
+            self.table.hideColumn(col)
 
     def set_data_box_greyed_out(self, state: bool):
         self.data_box.setEnabled(not state)
