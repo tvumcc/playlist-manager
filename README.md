@@ -19,5 +19,5 @@ Once you enter these in once, they will be saved and you do not have to enter th
 To build, an [ffmpeg executable](https://www.ffmpeg.org/download.html#build-windows) needs to be downloaded and placed in the project's root directory. From there, use pyinstaller to package the project as an executable.
 
 ```bash
-pyinstaller src/main.py --name playlist_manager_v1.0 --add-binary "ffmpeg.exe;." --onefile --noconsole
+pyinstaller src/main.py --name playlist_manager --add-binary "ffmpeg.exe;." --onefile --noconsole
 ```
