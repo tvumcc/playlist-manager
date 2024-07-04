@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import *
+from PyQt6.QtCore import QCoreApplication
 
 import os
 
@@ -92,16 +93,19 @@ class Application:
 
             for track in tracks:
                 self.gui.set_progress_bar_status(f"Downloading {track.title} from Youtube")
+                track.get_yt_video()
                 progress += 1
                 self.gui.set_progress_bar_percentage(progress)
-                track.get_yt_video()
+
+                QCoreApplication.processEvents() 
 
                 self.gui.set_progress_bar_status(f"Splicing data together and reformatting")
+                track.splice_ffmpeg()
                 progress += 1
                 self.gui.set_progress_bar_percentage(progress)
-                track.splice_ffmpeg()
 
-                self.gui.set_progress_bar_percentage(progress)
+                QCoreApplication.processEvents() 
+
                 track_path = track.clean(self.manager.get_playlist_path(self.current_playlist))
 
                 self.manager.set_track_to_synced(self.current_playlist, track.title, track_path)
@@ -128,7 +132,7 @@ class Application:
 
         track = Track(title, artists, yt, spotify, album, art_path)
 
-        if not track.valid():
+        if not track.valid_track:
             self.gui.track_invalid_message_box()
             return
 
@@ -145,10 +149,10 @@ class Application:
 
     """Resets the data box and removes the current track from the database."""
     def delete_track(self):
-        confirm = self.gui.track_deletion_confirmation(self.current_track if self.current_track is not None else "New Playlist")
+        confirm = self.gui.track_deletion_confirmation(self.current_track if self.current_track is not None else "New Track")
 
         if confirm:
-            self.manager.delete_track(self.current_playlist, self.current_track)
+            if self.current_track is not None: self.manager.delete_track(self.current_playlist, self.current_track)
             self.current_track = None
             self.track_new = False
             self.gui.clear_data_box()

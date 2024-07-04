@@ -9,13 +9,15 @@ from token_validator import *
 class Track:
     """Constructs a Track object which can be downloaded"""
     def __init__(self, title: str, artists: str, yt: str, spotify: str, album: str, art_path: str, art_url: str = ""):
-        self.title = title
-        self.artists = artists
-        self.yt = yt
-        self.spotify = spotify
-        self.album = album
-        self.art_path = art_path
-        self.art_url = art_url
+        self.title = title.replace("''", "'")
+        self.artists = artists.replace("''", "'")
+        self.yt = yt.replace("''", "'")
+        self.spotify = spotify.replace("''", "'")
+        self.album = album.replace("''", "'")
+        self.art_path = art_path.replace("''", "'")
+        self.art_url = art_url.replace("''", "'")
+        self.valid_track = self.valid()
+        if not self.valid_track: return
 
         # Determine whether or not it should fetch data from Spotify
         if spotify != "" and (self.title == "" or self.artists == "" or self.album == "" or self.art_url == ""):
